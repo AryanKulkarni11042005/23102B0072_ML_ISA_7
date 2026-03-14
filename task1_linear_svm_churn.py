@@ -1,11 +1,10 @@
 # task1_linear_svm_churn.py
 
-import argparse
 import pandas as pd
 import numpy as np
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.metrics import (
     confusion_matrix,
@@ -20,43 +19,69 @@ RANDOM_STATE = 42
 
 
 # -------------------------
-# Preprocessing
+# Hardcoded values
 # -------------------------
 
-def load_and_preprocess(path, target):
+DATA_PATH = "Telco-Customer-Churn.csv"
 
-    df = pd.read_csv(path)
+TARGET = "Churn"
 
-    # Remove customerID from features but keep for output
+TEST_SIZE = 0.2
+
+C_VALUES = [0.1, 1, 10]
+
+
+# -------------------------
+# Preprocess
+# -------------------------
+
+def load_and_preprocess():
+
+    df = pd.read_csv(DATA_PATH)
+
     customer_ids = df["customerID"]
 
-    # Fix TotalCharges column
-    df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
-    df["TotalCharges"].fillna(df["TotalCharges"].median(), inplace=True)
+    # Fix TotalCharges
+    df["TotalCharges"] = pd.to_numeric(
+        df["TotalCharges"],
+        errors="coerce"
+    )
+
+    df["TotalCharges"] = df["TotalCharges"].fillna(
+        df["TotalCharges"].median()
+    )
 
     # Encode target
-    y = df[target].map({"Yes": 1, "No": 0})
+    y = df[TARGET].map({
+        "Yes": 1,
+        "No": 0
+    })
 
-    X = df.drop(columns=[target, "customerID"])
+    X = df.drop(
+        columns=[TARGET, "customerID"]
+    )
 
-    # One-hot encoding for categorical
-    X = pd.get_dummies(X, drop_first=True)
+    # One hot encoding
+    X = pd.get_dummies(
+        X,
+        drop_first=True
+    )
+
+    # ✅ Fix remaining NaN if any
+    X = X.fillna(0)
 
     return X, y, customer_ids
 
 
 # -------------------------
-# Train & evaluate
+# Evaluate
 # -------------------------
 
 def evaluate_model(model, X_test, y_test):
 
     y_pred = model.predict(X_test)
 
-    if hasattr(model, "decision_function"):
-        scores = model.decision_function(X_test)
-    else:
-        scores = y_pred
+    scores = model.decision_function(X_test)
 
     cm = confusion_matrix(y_test, y_pred)
 
@@ -75,25 +100,13 @@ def evaluate_model(model, X_test, y_test):
 
 def main():
 
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--data", required=True)
-    parser.add_argument("--target", required=True)
-    parser.add_argument("--test_size", type=float, default=0.2)
-    parser.add_argument("--C", type=float, nargs="+", required=True)
-
-    args = parser.parse_args()
-
-    X, y, customer_ids = load_and_preprocess(
-        args.data,
-        args.target
-    )
+    X, y, customer_ids = load_and_preprocess()
 
     X_train, X_test, y_train, y_test, id_train, id_test = train_test_split(
         X,
         y,
         customer_ids,
-        test_size=args.test_size,
+        test_size=TEST_SIZE,
         stratify=y,
         random_state=RANDOM_STATE
     )
@@ -105,15 +118,14 @@ def main():
 
     results = []
 
-    for C_value in args.C:
+    for C_value in C_VALUES:
 
-        print("\n==========================")
+        print("\n====================")
         print("C =", C_value)
 
         model = SVC(
             kernel="linear",
             C=C_value,
-            probability=False,
             random_state=RANDOM_STATE
         )
 
@@ -166,7 +178,7 @@ def main():
         index=False
     )
 
-    print("\nSummary:")
+    print("\nSummary Table:")
     print(results_df)
 
 
